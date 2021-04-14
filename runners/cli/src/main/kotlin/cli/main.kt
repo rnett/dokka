@@ -316,7 +316,13 @@ object ArgTypeSourceLinkDefinition : ArgType<DokkaConfiguration.SourceLinkDefini
 data class ArgTypeArgument(val moduleName: CLIEntity<kotlin.String>) :
     ArgType<DokkaConfiguration.DokkaSourceSet>(true) {
     override fun convert(value: kotlin.String, name: kotlin.String): DokkaConfiguration.DokkaSourceSet =
-        parseSourceSet(moduleName.value, value.split(" ").filter { it.isNotBlank() }.toTypedArray())
+        if(moduleName.valueOrigin != ArgParser.ValueOrigin.UNSET && moduleName.valueOrigin != ArgParser.ValueOrigin.UNDEFINED){
+            moduleName.value
+        } else {
+            DokkaDefaults.moduleName
+        }.let { moduleNameOrDefault ->
+            parseSourceSet(moduleNameOrDefault, value.split(" ").filter { it.isNotBlank() }.toTypedArray())
+        }
 
     override val description: kotlin.String
         get() = ""
