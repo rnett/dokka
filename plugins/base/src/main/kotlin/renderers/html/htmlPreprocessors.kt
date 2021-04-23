@@ -13,6 +13,7 @@ import org.jetbrains.dokka.pages.*
 import org.jetbrains.dokka.plugability.DokkaContext
 import org.jetbrains.dokka.plugability.configuration
 import org.jetbrains.dokka.transformers.pages.PageTransformer
+import org.jetbrains.dokka.utilities.orderBy
 
 abstract class NavigationDataProvider {
     open fun navigableChildren(input: RootPageNode): NavigationNode =
@@ -75,15 +76,25 @@ open class NavigationSearchInstaller(val context: DokkaContext) : NavigationData
 }
 
 open class NavigationPageInstaller(val context: DokkaContext) : NavigationDataProvider(), PageTransformer {
+    private val configuration = configuration<DokkaBase, DokkaBaseConfiguration>(context)
 
     override fun invoke(input: RootPageNode): RootPageNode =
         input.modified(
             children = input.children + NavigationPage(
-                root = navigableChildren(input),
+                root = navigableChildren(input).let {
+                    if (input is MultimoduleRootPageNode)
+                        it.copy(children = it.children.sortModules(configuration?.moduleOrder.orEmpty()))
+                    else
+                        it
+                },
                 moduleName = context.configuration.moduleName,
                 context = context
             )
         )
+
+    private fun List<NavigationNode>.sortModules(order: List<String>): List<NavigationNode> =
+        orderBy(order, { it.sortedBy { it.name } }) { it.name }
+
 }
 
 class CustomResourceInstaller(val dokkaContext: DokkaContext) : PageTransformer {

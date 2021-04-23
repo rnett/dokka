@@ -3,6 +3,7 @@ package org.jetbrains.dokka.allModulesPage
 import org.jetbrains.dokka.DokkaConfiguration.DokkaModuleDescription
 import org.jetbrains.dokka.DokkaConfiguration.DokkaSourceSet
 import org.jetbrains.dokka.base.DokkaBase
+import org.jetbrains.dokka.base.DokkaBaseConfiguration
 import org.jetbrains.dokka.base.parsers.MarkdownParser
 import org.jetbrains.dokka.base.parsers.moduleAndPackage.ModuleAndPackageDocumentation.Classifier.Module
 import org.jetbrains.dokka.base.parsers.moduleAndPackage.ModuleAndPackageDocumentationParsingContext
@@ -24,6 +25,7 @@ import org.jetbrains.dokka.plugability.plugin
 import org.jetbrains.dokka.plugability.querySingle
 import org.jetbrains.dokka.transformers.pages.PageCreator
 import org.jetbrains.dokka.utilities.DokkaLogger
+import org.jetbrains.dokka.utilities.orderBy
 import org.jetbrains.dokka.versioning.ReplaceVersionsCommand
 import org.jetbrains.dokka.versioning.VersioningConfiguration
 import org.jetbrains.dokka.versioning.VersioningPlugin
@@ -36,6 +38,8 @@ class MultimodulePageCreator(
 
     private val commentsConverter by lazy { context.plugin<DokkaBase>().querySingle { commentsToContentConverter } }
     private val signatureProvider by lazy { context.plugin<DokkaBase>().querySingle { signatureProvider } }
+
+    private val baseConfiguration = configuration<DokkaBase, DokkaBaseConfiguration>(context)
 
     override fun invoke(creationContext: AllModulesPageGeneration.DefaultAllModulesContext): RootPageNode {
         val modules = context.configuration.modules
@@ -63,7 +67,8 @@ class MultimodulePageCreator(
             header(2, "All modules:")
             table(styles = setOf(MultimoduleTable)) {
                 header { group { text("Name") } }
-                modules.filter { it.name in creationContext.nonEmptyModules }.sortedByDescending { it.name }
+                modules.filter { it.name in creationContext.nonEmptyModules }
+                    .sortModules(baseConfiguration?.moduleOrder.orEmpty())
                     .forEach { module ->
                         val displayedModuleDocumentation = getDisplayedModuleDocumentation(module)
                         val dri = DRI(packageName = MULTIMODULE_PACKAGE_PLACEHOLDER, classNames = module.name)
@@ -93,6 +98,9 @@ class MultimodulePageCreator(
             contentNode
         )
     }
+
+    private fun List<DokkaModuleDescription>.sortModules(order: List<String>): List<DokkaModuleDescription> =
+        orderBy(order, { it.sortedBy { it.name } }) { it.name }
 
     private fun getMultiModuleDocumentation(files: Set<File>): List<DocumentationNode> =
         files.map { MarkdownParser({ null }, it.absolutePath).parse(it.readText()) }
